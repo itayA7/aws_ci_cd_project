@@ -1,8 +1,10 @@
 import logging
 import os
+from html import escape
 
 import psycopg
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse
 from psycopg.rows import dict_row
 from pydantic import BaseModel, Field
 
@@ -110,11 +112,45 @@ def create_entry(entry: EntryIn):
         raise HTTPException(status_code=503, detail="database unavailable")
 
 
+def render_entries_table(rows: list[dict]) -> str:
+    """Build a simple HTML table. Messages are escaped so user text cannot inject HTML."""
+    body = "".join(
+        f"<tr><td>{r['id']}</td><td>{escape(r['message'])}</td>"
+        f"<td>{escape(str(r['created_at']))}</td></tr>"
+        for r in rows
+    ) or '<tr><td colspan="3">No entries yet</td></tr>'
+    return f"""<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Entries</title>
+  <style>
+    body {{ font-family: sans-serif; margin: 2rem; }}
+    table {{ border-collapse: collapse; min-width: 480px; }}
+    th, td {{ border: 1px solid #ccc; padding: 8px 12px; text-align: left; }}
+    th {{ background: #f2f2f2; }}
+  </style>
+</head>
+<body>
+  <h1>Entries</h1>
+  <table>
+    <tr><th>ID</th><th>Message</th><th>Created at</th></tr>
+    {body}
+  </table>
+</body>
+</html>"""
+
+
 @app.get("/entries")
-def list_entries(limit: int = Query(10, ge=1, le=100)):
+def list_entries(request: Request, limit: int = Query(10, ge=1, le=100)):
     # Latest entries, newest first.
     try:
-        return db_latest_entries(limit)
+        rows = db_latest_entries(limit)
     except psycopg.Error:
         logger.exception("failed to read entries")
         raise HTTPException(status_code=503, detail="database unavailable")
+
+    # Browsers ask for HTML and get a table; curl, tests and /docs get JSON.
+    if "text/html" in request.headers.get("accept", ""):
+        return HTMLResponse(render_entries_table(rows))
+    return rows
