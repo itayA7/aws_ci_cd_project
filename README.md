@@ -1,1 +1,1 @@
-This is the first README version. Change it later
+This is the second version of the app including calling to RDS 
