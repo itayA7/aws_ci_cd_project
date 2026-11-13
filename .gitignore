@@ -1,22 +1,7 @@
-# ---- Python ----
-__pycache__/
-*.pyc
-.venv/
-venv/
-.pytest_cache/
-.ruff_cache/
- 
-# ---- Editors and OS ----
-.vscode/
-.idea/
-.DS_Store
-
-# ---- Secrets and credentials (never commit) ----
-.env
-.env.*
-*.pem
-*.key
-secrets.tfvars
-*.secret.tfvars
+app/.env
 .aws/
-credentials
+
+#Terraform
+terraform-aws-infra/.terraform/
+terraform-aws-infra/.terraform.lock.hcl
+terraform-aws-infra/terraform.tfstate*
