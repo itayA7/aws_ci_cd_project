@@ -1,0 +1,24 @@
+name: Simple CI
+
+on:
+ push:
+   branches: [main]
+ pull_request:
+   branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+
+      - name: Simple Check
+        run: python3 -m compileall -q .
