@@ -6,6 +6,9 @@ on:
  pull_request:
    branches: [main]
 
+env:
+  IMAGE_NAME: entries-api
+
 jobs:
   ci:
     runs-on: ubuntu-latest
@@ -22,3 +25,11 @@ jobs:
 
       - name: Simple Check
         run: python3 -m compileall -q .
+
+
+      - name: Build  docker image
+        run: |
+         SHORT_SHA=${{github.sha}}
+         echo "Building docker image with tag: ${{ env.IMAGE_NAME }}:${SHORT_SHA}" 
+         docker build --tag ${{ env.IMAGE_NAME }}:${SHORT_SHA} .
+         docker images

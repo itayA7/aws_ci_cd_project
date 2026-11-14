@@ -1,6 +1,9 @@
 app/.env
 .aws/
 
+test.yml
+.gitignore
+
 #Terraform
 terraform-aws-infra/.terraform/
 terraform-aws-infra/.terraform.lock.hcl
