@@ -1,0 +1,68 @@
+name: Deploy to AWS ECS Fargate
+
+on:
+ push:
+   branches: [main]
+ pull_request:
+   branches: [main]
+
+
+permissions:
+  id-token: write    # allow OIDC token
+  contents: read
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+  ECS_CLUSTER: ${{vars.ECS_CLUSTER}}     
+  ECS_SERVICE: ${{vars.ECS_SERVICE}}    
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+
+      - name: Simple Check
+        run: python3 -m compileall -q .
+
+
+      - name: Set short git commit SHA
+        run: |
+         calculatedSha=$(git rev-parse --short ${{ github.sha }})
+         echo "COMMIT_SHORT_SHA=$calculatedSha" >> $GITHUB_ENV
+
+
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        run: |
+          aws ecr get-login-password --region ${AWS_REGION} \
+            | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+
+      - name: Build  docker image
+        id: build-image
+        run: |
+         IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:${env.COMMIT_SHORT_SHA}
+         docker build --tag ${IMAGE_URI} .
+         docker images
+
+      - name: Push image to ECR
+        run: |
+          IMAGE_URI=${{ steps.build-image.outputs.IMAGE_URI }}
+          echo "Pushing docker image to ECR: $IMAGE_URI"
+          docker push $IMAGE_URI

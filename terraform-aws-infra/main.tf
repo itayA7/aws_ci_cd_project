@@ -251,6 +251,9 @@ resource "aws_ecs_service" "app" {
     container_name   = var.app_name
     container_port   = var.container_port
   }
+  lifecycle {
+    ignore_changes = [task_definition]
+  }
 
   depends_on = [aws_lb_listener.http]
 }
