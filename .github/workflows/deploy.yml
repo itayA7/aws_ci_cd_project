@@ -77,3 +77,30 @@ jobs:
         run: |
          echo "pushing docker image to ECR: ${IMAGE_URI}"
          docker push ${IMAGE_URI}
+
+
+      - name: Download current task definition
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "$ECS_TASK_DEFINITION" \
+            --query taskDefinition \
+            > "$RUNNER_TEMP/task-definition.json"
+
+      - name: Put new image into task definition
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: render
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ runner.temp }}/task-definition.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ env.IMAGE_URI }}
+
+      - name: Register new revision and update service
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render.outputs.task-definition }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          service: ${{ env.ECS_SERVICE }}
+          wait-for-service-stability: true
