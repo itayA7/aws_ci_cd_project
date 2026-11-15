@@ -19,7 +19,9 @@ env:
   ECS_SERVICE: ${{vars.ECS_SERVICE}}    
 
 jobs:
-  ci:
+
+
+  main:
     runs-on: ubuntu-latest
 
 
@@ -40,25 +42,33 @@ jobs:
         run: |
          calculatedSha=$(git rev-parse --short ${{ github.sha }})
          echo "COMMIT_SHORT_SHA=$calculatedSha" >> $GITHUB_ENV
-
-
+      - name: Build  docker image
+        id: build-image
+        run: |
+         IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:${COMMIT_SHORT_SHA}
+         docker build --provenance=false --sbom=false --tag ${IMAGE_URI} .
+         docker images
+         echo "IMAGE_URI=$IMAGE_URI" >> "$GITHUB_ENV"
+      - name: Run Trivy scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{env.IMAGE_URI}}
+          format: "table"
+          exit-code: 1
+          ignore-unfixed: true
+          severity: "CRITICAL,HIGH"
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME_ARN }}
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
         run: |
           aws ecr get-login-password --region ${AWS_REGION} \
             | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
-
-      - name: Build  docker image and push to ECR
-        id: build-image
+      - name: Push docker image to ECR
         run: |
-         IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:${env.COMMIT_SHORT_SHA}
-         docker build --tag ${IMAGE_URI} .
-         docker images
          echo "pushing docker image to ECR: ${IMAGE_URI}"
          docker push ${IMAGE_URI}
