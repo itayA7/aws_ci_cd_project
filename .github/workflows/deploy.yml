@@ -16,10 +16,11 @@ env:
   AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
   ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
   ECS_CLUSTER: ${{vars.ECS_CLUSTER}}     
-  ECS_SERVICE: ${{vars.ECS_SERVICE}}    
+  ECS_SERVICE: ${{vars.ECS_SERVICE}}
+  ECS_TASK_DEFINITION: ${{ vars.ECS_TASK_DEFINITION }}
+  CONTAINER_NAME: ${{ vars.CONTAINER_NAME }}    
 
 jobs:
-
 
   main:
     runs-on: ubuntu-latest
@@ -33,22 +34,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-
       - name: Simple Check
         run: python3 -m compileall -q .
-
 
       - name: Set short git commit SHA
         run: |
          calculatedSha=$(git rev-parse --short ${{ github.sha }})
          echo "COMMIT_SHORT_SHA=$calculatedSha" >> $GITHUB_ENV
+
       - name: Build  docker image
         id: build-image
         run: |
          IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:${COMMIT_SHORT_SHA}
-         docker build --provenance=false --sbom=false --tag ${IMAGE_URI} .
+         docker build --provenance=false --sbom=false  --build-arg APP_VERSION=${COMMIT_SHORT_SHA} --tag ${IMAGE_URI} .
          docker images
          echo "IMAGE_URI=$IMAGE_URI" >> "$GITHUB_ENV"
+
       - name: Run Trivy scan
         uses: aquasecurity/trivy-action@master
         with:
@@ -59,16 +60,20 @@ jobs:
           severity: "CRITICAL,HIGH"
 
       - name: Configure AWS credentials (OIDC)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           aws ecr get-login-password --region ${AWS_REGION} \
             | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+
       - name: Push docker image to ECR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
          echo "pushing docker image to ECR: ${IMAGE_URI}"
          docker push ${IMAGE_URI}
