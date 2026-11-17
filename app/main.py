@@ -85,6 +85,10 @@ def health():
     # Liveness: the process is up. Never touches the database.
     return {"status": "ok"}
 
+@app.get("/check")
+def check():
+    return {"message":"Looking for something"}
+
 
 @app.get("/ready")
 def ready():
