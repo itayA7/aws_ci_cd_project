@@ -1,4 +1,4 @@
-# AWS CI/CD Platform — GitHub Actions & ECS Fargate
+# AWS CI/CD Platform — GitHub Actions & Terraform
 
 An end-to-end, production-style AWS deployment project demonstrating containerization, Infrastructure as Code, automated CI/CD, image security scanning, and secure application-to-database connectivity. The application is packaged with Docker, stored in Amazon ECR, and deployed to Amazon ECS on Fargate through GitHub Actions. Terraform provisions the AWS infrastructure.
 
@@ -17,32 +17,11 @@ An end-to-end, production-style AWS deployment project demonstrating containeriz
 5. ECS retrieves database settings from AWS Secrets Manager. The task execution role is scoped to the required secret.
 6. ECS pulls the container image from Amazon ECR and sends application logs to CloudWatch Logs.
 
-> RDS is private and is not directly reachable from the public internet. The current database configuration is single-AZ (`db.t4g.micro`, 20 GB).
+
 
 ## CI/CD pipeline
 
-```mermaid
-flowchart TD
-    A[Developer pushes code or opens PR] --> B[GitHub Actions]
-    B --> C[Python compile check]
-    C --> D[Build Docker image]
-    D --> E[Trivy image scan]
-    E --> F{Event and scan result}
-    F -->|PR| G[CI result — no AWS deployment]
-    F -->|Push to main, scan passes| H[Authenticate to AWS with GitHub OIDC]
-    H --> I[Login to Amazon ECR]
-    I --> J[Push image tagged with Git SHA]
-    J --> K[Read current ECS task definition]
-    K --> L[Update image and register new revision]
-    L --> M[Deploy to ECS Fargate]
-    M --> N[Wait for ECS service stability]
-    E -->|HIGH/CRITICAL finding| X[Fail workflow]
-    N -->|Deployment does not stabilize| Y[Fail workflow]
-```
-
-
-
-
+![AWS architecture diagram](docs/cicd-pipeline-flowchart.png)
 
 ## Security considerations
 
